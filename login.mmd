@@ -1,0 +1,14 @@
+sequenceDiagram
+    autonumber
+    participant FE as Frontend（ブラウザ）
+    participant BE as Backend（Go）
+    participant R as Redis
+
+    FE->>BE: POST /api/login
+    BE-->>FE: { token(JWT), userId }
+
+    FE->>BE: WebSocket 接続 /ws?token=JWT
+    BE->>BE: parseJWT(token) → userId
+    BE->>R: HSET mm:session:<uid> {status: idle, connId, updated_at}
+    BE->>R: EXPIRE mm:session:<uid> 60s
+    BE-->>FE: WS onopen（以降 WS でやりとり）

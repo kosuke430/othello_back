@@ -1,0 +1,33 @@
+sequenceDiagram
+    autonumber
+    participant FE1 as Frontend A
+    participant FE2 as Frontend B
+    participant BE as Backend（Go）
+    participant R as Redis
+
+    rect rgba(230,230,255,0.4)
+      note over FE1: 対戦開始ボタン
+      FE1->>BE: WS send {"type":"enqueue","mode":"othello"}
+      BE->>R: ZADD mm:queue:othello (score=now, member="<uid1>")
+      BE->>R: HSET mm:session:<uid1> {status: waiting, connId, updated_at}
+      BE->>R: EXPIRE mm:session:<uid1> 60s
+      BE-->>FE1: WS {"type":"enqueued","position":..., "waiting":...}
+    end
+
+    rect rgba(230,230,255,0.4)
+      note over FE2: もう一人も対戦開始
+      FE2->>BE: WS send {"type":"enqueue","mode":"othello"}
+      BE->>R: ZADD mm:queue:othello (score=now, member="<uid2>")
+      BE->>R: HSET mm:session:<uid2> {status: waiting, connId, updated_at}
+      BE->>R: EXPIRE mm:session:<uid2> 60s
+      BE-->>FE2: WS {"type":"enqueued","position":..., "waiting":...}
+    end
+
+    par マッチングワーカー（常時）
+      BE->>R: ZPOPMIN mm:queue:othello 2
+      R-->>BE: [{member:"<uid1>",score:t1},{member:"<uid2>",score:t2}]
+      BE->>BE: matchId生成 + 先後決定
+      BE-->>FE1: WS {"type":"match_found","matchId", "opponent":{id:uid2},"side":"black/white"}
+      BE-->>FE2: WS {"type":"match_found","matchId", "opponent":{id:uid1},"side":"white/black"}
+      note over FE1,FE2: それぞれ /game/:matchId に遷移
+    end

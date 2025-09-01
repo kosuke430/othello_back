@@ -1,0 +1,26 @@
+sequenceDiagram
+    autonumber
+    participant FE as Frontend
+    participant BE as Backend（Go）
+    participant R as Redis
+
+    %% キャンセル
+    FE->>BE: WS send {"type":"cancel"}
+    BE->>R: ZREM mm:queue:othello "<uid>"
+    BE->>R: HSET mm:session:<uid> {status: idle}
+    BE->>R: EXPIRE mm:session:<uid> 60s
+    BE-->>FE: WS {"type":"canceled"}
+
+    %% ハートビート
+    loop 25秒毎
+      FE->>BE: WS send {"type":"heartbeat"}
+      BE->>R: HSET mm:session:<uid> {connId, updated_at}  <!-- statusは更新しないのが推奨 -->
+      BE->>R: EXPIRE mm:session:<uid> 60s
+      BE-->>FE: WS {"type":"pong"}
+    end
+
+    %% 切断（ブラウザ閉じる等）
+    FE--xBE: WS close
+    BE->>R: ZREM mm:queue:othello "<uid>"
+    BE->>R: HSET mm:session:<uid> {status: disconnected}
+    BE-->>BE: hub.unreg <- Conn, close(send)

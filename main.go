@@ -259,7 +259,6 @@ func reader(c *Conn) {
 		case "heartbeat":
 			// セッション延命（status は簡易に 'idle'、厳密にやるなら現値維持でもOK）
 			_ = rdb.HSet(ctx, keySessionFn(c.userID), map[string]any{
-				"status":     "idle",
 				"connId":     c.id,
 				"updated_at": time.Now().Unix(),
 			}).Err()
